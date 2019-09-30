@@ -23,6 +23,7 @@
 #include <boost/endian/arithmetic.hpp>
 
 #include <array>
+#include <map>
 #include <initializer_list>
 #include <ostream>
 #include <cstddef>
@@ -37,6 +38,15 @@ class PacketIn;
 
 namespace runos {
 
+class dhcp_opt {
+public:
+    uint8_t code;
+    uint8_t number;
+    uint8_t *value;
+
+    dhcp_opt(uint8_t c = 0, uint8_t n = 0, uint8_t* v = nullptr): code(c), number(n), value(v) {}
+};
+
 class PacketParser final : public SerializablePacket {
     // buffer
     uint8_t* data;
@@ -45,7 +55,7 @@ class PacketParser final : public SerializablePacket {
     bool vlan_tagged;
 
     // bindings
-    typedef std::array<void*, 40> bindings_arr;
+    typedef std::array<void*, 45> bindings_arr;
     bindings_arr bindings;
 
     // replace with
@@ -55,10 +65,13 @@ class PacketParser final : public SerializablePacket {
     safe_ptr<struct tcp_hdr> tcp;
     safe_ptr<struct udp_hdr> udp;
     safe_ptr<struct arp_hdr> arp;
+    safe_ptr<struct dhcp_hdr> dhcp;
+    std::map<uint8_t, dhcp_opt> dhcp_options;
 
     void parse_l2(uint8_t* data, size_t data_len);
     void parse_l3(uint16_t eth_type, uint8_t* data, size_t data_len);
     void parse_l4(uint8_t protocol, uint8_t* data, size_t data_len);
+    void parse_dhcp(uint8_t* data, size_t data_len);
 
     using binding_list =
         std::initializer_list<std::pair<of::oxm::basic_match_fields, void*>>;
@@ -76,6 +89,8 @@ public:
 
     size_t total_bytes() const override;
     size_t serialize_to(size_t buffer_size, void* buffer) const override;
+
+    dhcp_opt get_dhcp_option(uint8_t code);
 };
 
 } // namespace runos

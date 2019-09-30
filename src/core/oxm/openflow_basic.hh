@@ -96,5 +96,22 @@ struct arp_tha : define_ofb_type
     < arp_tha, of::oxm::basic_match_fields::ARP_THA, 48, ethaddr, ethaddr, true >
 { };
 
+// DHCP
+struct dhcp_xid : define_ofb_type
+    < dhcp_xid, of::oxm::basic_match_fields::DHCP_XID, 32, uint32_t >
+{ };
+
+struct dhcp_ciaddr : define_ofb_type
+    < dhcp_ciaddr, of::oxm::basic_match_fields::DHCP_CIADDR, 32, uint32_t >
+{ };
+
+struct dhcp_yiaddr : define_ofb_type
+    < dhcp_yiaddr, of::oxm::basic_match_fields::DHCP_YIADDR, 32, uint32_t >
+{ };
+
+struct dhcp_chaddr : define_ofb_type
+    < dhcp_chaddr, of::oxm::basic_match_fields::DHCP_CHADDR, 48, ethaddr >
+{ };
+
 }
 }

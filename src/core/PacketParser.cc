@@ -61,10 +61,10 @@ struct dot1q_hdr {
 static_assert(sizeof(dot1q_hdr) == 18, "");
 
 struct ipv4_hdr {
-    uint8_t version:4;
     uint8_t ihl:4;
-    uint8_t dscp:6;
+    uint8_t version:4;
     uint8_t ecn:2;
+    uint8_t dscp:6;
     big_uint16_t total_len;
     big_uint16_t identification;
     struct {
@@ -110,6 +110,8 @@ struct udp_hdr {
     big_uint16_t dst;
     big_uint16_t length;
     big_uint16_t checksum;
+
+    size_t header_length() const { return 8;}
 };
 static_assert(sizeof(udp_hdr) == 8, "");
 
@@ -125,6 +127,23 @@ struct arp_hdr {
     big_uint32_t tpa;
 };
 static_assert(sizeof(arp_hdr) == 28, "");
+
+struct dhcp_hdr {
+    big_uint8_t op;
+    big_uint8_t htype;
+    big_uint8_t hlen;
+    big_uint8_t hops;
+    big_uint32_t xid;
+    big_uint16_t secs;
+    big_uint16_t flags;
+    big_uint32_t ciaddr;
+    big_uint32_t yiaddr;
+    big_uint32_t siaddr;
+    big_uint32_t giaddr;
+    big_uint48_t chaddr;
+    uint8_t options[];
+};
+static_assert(sizeof(dhcp_hdr) >= 34, "");
 
 // TODO: make it more safe
 // add size-checking of passed oxm type against field size
@@ -223,7 +242,7 @@ void PacketParser::parse_l3(uint16_t eth_type, uint8_t* data, size_t data_len)
     }
 }
 
-void PacketParser::parse_l4(uint8_t protocol, uint8_t* , size_t )
+void PacketParser::parse_l4(uint8_t protocol, uint8_t* data, size_t data_len)
 {
     switch (protocol) {
     case 0x06: // tcp
@@ -242,10 +261,59 @@ void PacketParser::parse_l4(uint8_t protocol, uint8_t* , size_t )
                 { ofb::UDP_SRC, &udp->src },
                 { ofb::UDP_DST, &udp->dst }
             });
+
+            if (data_len > udp->header_length()) {
+                if ((udp->src == 68) && (udp->dst == 67)) {
+                    parse_dhcp(data + udp->header_length(),
+                               data_len - udp->header_length());
+                }
+            }
         }
         break;
     case 0x01: // icmp
         break;
+    }
+}
+
+
+void PacketParser::parse_dhcp(uint8_t* data, size_t data_len) {
+    if (sizeof(dhcp_hdr) <= data_len) {
+        dhcp = reinterpret_cast<dhcp_hdr*>(data);
+        bind({
+                     { ofb::DHCP_OP, &dhcp->op },
+                     { ofb::DHCP_XID, &dhcp->xid },
+                     { ofb::DHCP_CIADDR, &dhcp->ciaddr },
+                     { ofb::DHCP_YIADDR, &dhcp->yiaddr },
+                     { ofb::DHCP_CHADDR, &dhcp->chaddr }
+             });
+
+        // options parsing
+        uint8_t* tmp = dhcp->options;
+        bool flag = false;
+        for(size_t i = 0; i <= data_len - 34; ++i) {
+            tmp = dhcp->options + i;
+            if (flag) {
+                if (*tmp == 0xFF) break;
+                this->dhcp_options[*tmp] = dhcp_opt(*tmp, *(tmp + 1), tmp + 2);
+                i += *(tmp + 1) + 1;
+            }
+            if ((!flag) && (*tmp == 0x63))
+                if ((i + 1 <= data_len - 34) &&(*(tmp + 1) == 0x82))
+                    if ((i + 2 <= data_len - 34) &&(*(tmp + 2) == 0x53))
+                        if ((i + 3 <= data_len - 34) &&(*(tmp + 3) == 0x63)) {
+                            flag = true;
+                            i += 3;
+                        }
+        }
+    }
+}
+
+dhcp_opt PacketParser::get_dhcp_option(uint8_t code) {
+    auto T = this->dhcp_options.find(code);
+    if (T == this->dhcp_options.end()) {
+        return dhcp_opt();
+    } else {
+        return this->dhcp_options[code];
     }
 }
 

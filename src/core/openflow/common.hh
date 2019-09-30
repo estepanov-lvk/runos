@@ -96,6 +96,14 @@ enum class basic_match_fields : uint8_t {
     PBB_ISID       = 37, /* PBB I-SID. */
     TUNNEL_ID      = 38, /* Logical Port Metadata. */
     IPV6_EXTHDR    = 39, /* IPv6 Extension Header pseudo-field */
+
+    /* DHCP */
+    DHCP_OP        = 40, /* Type of DHCP message */
+    DHCP_XID       = 41, /* Tranzaction identifer */
+    DHCP_CIADDR    = 42, /* The latest client ip address */
+    DHCP_YIADDR    = 43, /* New client ip address */
+    DHCP_CHADDR    = 44, /* Client MAC address */
+    DHCP_OPTIONS   = 45  /* DHCP options */
 };
 
 struct header {
